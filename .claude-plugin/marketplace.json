@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mnemo",
+  "description": "Markdown-first knowledge memory for AI agents — the vault of .md files is the source of truth, FTS5 is a derived index.",
+  "owner": {
+    "name": "Esequiel Jara"
+  },
+  "plugins": [
+    {
+      "name": "mnemo",
+      "description": "Persistent knowledge memory: markdown vault + FTS5 search, a reasoned relation graph (contradiction surfacing), and a CLAUDE.md hot cache. Skills: /mnemo:start, /mnemo:ingest, /mnemo:query, /mnemo:lint.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Esequiel Jara"
+      },
+      "source": "./plugin",
+      "category": "productivity",
+      "homepage": "https://github.com/JaraEsequiel/mnemo"
+    }
+  ]
+}

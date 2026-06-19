@@ -1,0 +1,9 @@
+{
+  "name": "mnemo",
+  "description": "Markdown-first knowledge memory for AI agents. The vault of .md files is the source of truth; SQLite/FTS5 is a derived, rebuildable index.",
+  "version": "0.1.0",
+  "author": {
+    "name": "mnemo"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,11 @@
+# build output
+/bin/
+/dist/
+
+# derived index (the markdown is the source of truth)
+**/.mnemo/wiki.db
+**/.mnemo/wiki.db-shm
+**/.mnemo/wiki.db-wal
+
+# OS
+.DS_Store

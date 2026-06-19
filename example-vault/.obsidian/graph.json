@@ -1,0 +1,28 @@
+{
+  "collapse-filter": true,
+  "search": "",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    { "query": "path:decisions", "color": { "a": 1, "rgb": 31 } },
+    { "query": "path:ideas",     "color": { "a": 1, "rgb": 16745728 } },
+    { "query": "path:concepts",  "color": { "a": 1, "rgb": 43818 } },
+    { "query": "path:entities",  "color": { "a": 1, "rgb": 10233776 } },
+    { "query": "path:projects",  "color": { "a": 1, "rgb": 16766720 } },
+    { "query": "path:sources",   "color": { "a": 1, "rgb": 8421504 } }
+  ],
+  "collapse-display": false,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.5,
+  "repelStrength": 12,
+  "linkStrength": 0.7,
+  "linkDistance": 200,
+  "scale": 1
+}
