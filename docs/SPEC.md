@@ -123,6 +123,7 @@ internal/
   outputs/  graph.json, marp, tablas (fase 2)
   llm/      juez de contradicciones vía claude/opencode CLI (fase 2)
 skills/     start · ingest · query · lint · mnemo-maintainer (SKILL.md = contrato)
+hooks/      SessionStart (protocolo+contexto) · SessionStart:compact · UserPromptSubmit (ToolSearch + nudge)
 plugin/.claude-plugin/  plugin.json · .mcp.json
 ```
 
@@ -140,7 +141,7 @@ snippet, filtro por type/tags, fast-path exacto por slug.
 2. ✅ **`index.md` jerárquico** — `GenerateIndexes`: catálogo `slug → descripción` por carpeta + raíz, escritura idempotente. Fundido en `mnemo index`; comando `mnemo indexes`.
 3. ✅ **Refresco a demanda** — sin demonio en background (el watcher se eliminó por simplicidad): el índice + catálogos se regeneran con `mnemo index` / `/mnemo:ingest` / `/mnemo:lint`, y el MCP reindexa en cada búsqueda. Modelo deliberado estilo LLM-Wiki: vuelcas crudo → decides cuándo procesarlo.
 4. ✅ **MCP server** — `internal/mcp` (mcp-go v0.44.0): `wiki_search`, `wiki_get`, `wiki_list` por stdio. `mnemo mcp`. Probado con JSON-RPC real.
-5. ✅ **Plugin + skills** — `plugin/.claude-plugin/plugin.json`, `.mcp.json`, skills `mnemo-maintainer` (contrato siempre activo, incl. L0=CLAUDE.md promote/demote), `/start`, `/ingest`, `/query`, `/lint`.
+5. ✅ **Plugin + skills + hooks** — `plugin/.claude-plugin/plugin.json`, `.mcp.json`, skills `mnemo-maintainer` (contrato siempre activo, incl. L0=CLAUDE.md promote/demote), `/start`, `/ingest`, `/query`, `/lint`; **hooks** estilo engram (SessionStart inyecta el Memory Protocol + contexto vía `mnemo context`, compactación, UserPromptSubmit carga las `wiki_*` y nudge de guardado vía `mnemo last-activity`). Puntero `~/.mnemo/active-vault` para resolver el vault desde los hooks.
 6. 🟡 **Fase 2 (en curso)**:
    - ✅ **Stemming porter** en FTS5 + versionado de esquema (rebuild del índice desechable).
    - ✅ **`graph.json`** de Obsidian (`internal/graph`, color por carpeta) + `mnemo graph`.

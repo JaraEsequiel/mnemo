@@ -26,10 +26,11 @@ var ignoredFiles = map[string]bool{
 	"schema.md": true,
 }
 
-// ResolveRoot returns the vault root. Precedence: the explicit flag, then the
-// MNEMO_VAULT environment variable, then walking up from the cwd for a `.mnemo/`
-// directory; if none is found, the global default `~/.mnemo/vault` is used so a
-// zero-config install (e.g. the plugin's `mnemo mcp`) still has one brain.
+// ResolveRoot returns the vault root. Precedence: the explicit flag, the
+// MNEMO_VAULT environment variable, walking up from the cwd for a `.mnemo/`
+// directory, the active-vault pointer written by `mnemo setup`, and finally the
+// global default `~/.mnemo/vault`. The pointer lets hooks and ad-hoc commands
+// find the configured vault from any directory without an exported env var.
 func ResolveRoot(flag string) (string, error) {
 	if flag != "" {
 		return filepath.Abs(flag)
@@ -50,6 +51,9 @@ func ResolveRoot(flag string) (string, error) {
 			dir = parent
 		}
 	}
+	if p := readActiveVault(); p != "" {
+		return p, nil
+	}
 	return DefaultVault(), nil
 }
 
@@ -60,6 +64,32 @@ func DefaultVault() string {
 		return filepath.Join(".mnemo", "vault")
 	}
 	return filepath.Join(home, ".mnemo", "vault")
+}
+
+// ActiveVaultPointer is the path of the file recording the configured vault.
+func ActiveVaultPointer() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return filepath.Join(".mnemo", "active-vault")
+	}
+	return filepath.Join(home, ".mnemo", "active-vault")
+}
+
+// WriteActiveVault records root as the active vault for hooks/CLI to resolve.
+func WriteActiveVault(root string) error {
+	p := ActiveVaultPointer()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(p, []byte(root+"\n"), 0o644)
+}
+
+func readActiveVault() string {
+	data, err := os.ReadFile(ActiveVaultPointer())
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // DBPath returns the derived index path for a vault root.

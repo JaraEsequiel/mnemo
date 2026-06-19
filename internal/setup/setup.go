@@ -62,6 +62,11 @@ func Run(opts Options, out io.Writer) error {
 	idx.Close()
 	fmt.Fprintf(out, "✓ index built (.mnemo/wiki.db)\n")
 
+	// Record the active vault so hooks and ad-hoc CLI calls resolve it anywhere.
+	if err := vault.WriteActiveVault(opts.Vault); err == nil {
+		fmt.Fprintf(out, "✓ active vault recorded (%s)\n", vault.ActiveVaultPointer())
+	}
+
 	// 3. Obsidian graph config (preserve existing).
 	if opts.WriteGraph {
 		if err := graph.Write(opts.Vault, graph.Preserve); err != nil {
@@ -80,7 +85,7 @@ func Run(opts Options, out io.Writer) error {
 		if err := installSkills(opts.PluginSrc, dest); err != nil {
 			fmt.Fprintf(out, "! skills not installed: %v\n", err)
 		} else {
-			fmt.Fprintf(out, "✓ skills installed to %s (/mnemo:start, /mnemo:ingest, /mnemo:query, /mnemo:lint)\n", dest)
+			fmt.Fprintf(out, "✓ skills + hooks installed to %s (/mnemo:start, /mnemo:ingest, /mnemo:query, /mnemo:lint + Memory Protocol hooks)\n", dest)
 		}
 	}
 
@@ -137,7 +142,7 @@ func installSkills(pluginSrc, dest string) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return err
 	}
-	for _, sub := range []string{".claude-plugin", "skills"} {
+	for _, sub := range []string{".claude-plugin", "skills", "hooks"} {
 		src := filepath.Join(pluginSrc, sub)
 		if _, err := os.Stat(src); err != nil {
 			continue
