@@ -96,11 +96,17 @@ Dentro de Claude Code:
 | vault | `mnemo init` — estructura plana por tipo + `CLAUDE.md`/`working.md`/`log.md`/`.gitignore` |
 | índice | construye `.mnemo/wiki.db` (FTS5) + los `index.md` por carpeta |
 | graph | escribe `.obsidian/graph.json` (modo *preserve*) |
-| skills | copia `plugin/skills` a `~/.claude/skills/mnemo/` (comandos `/mnemo:*`) |
+| skills + hooks | copia `plugin/skills` y `plugin/hooks` a `~/.claude/skills/mnemo/` |
 | MCP | `claude mcp add mnemo --scope <s> -e MNEMO_VAULT=<vault> -- mnemo mcp` |
+| puntero | escribe `~/.mnemo/active-vault` para que los hooks resuelvan el vault |
 
 `MNEMO_VAULT` (variable que pasa el instalador al servidor MCP) hace que mnemo
 encuentre tu vault **desde cualquier directorio**.
+
+Los **hooks** (estilo engram) inyectan el Memory Protocol al iniciar sesión, cargan las tools
+`wiki_*` en el primer mensaje, recuperan contexto tras compactación y te recuerdan guardar si la
+memoria queda sin actualizar. Opcional: un puntero global en `~/.claude/CLAUDE.md`
+(ver `docs/global-claude-md.md`).
 
 ---
 

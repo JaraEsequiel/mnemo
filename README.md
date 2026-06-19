@@ -78,8 +78,16 @@ server reindexes on every search, so agent recall is always fresh. There is no b
 
 ## Claude Code plugin
 
-`plugin/` ships an MCP wiring (`.mcp.json`) and skills: `mnemo-maintainer` (always-active
-contract), `/start` (the grill → scaffold), `/ingest`, `/query`, `/lint`.
+`plugin/` ships:
+
+- **MCP wiring** (`.mcp.json`) — the `wiki_*` tools.
+- **Skills** — `mnemo-maintainer` (always-active contract), `/start` (the grill → scaffold),
+  `/ingest`, `/query`, `/lint`.
+- **Hooks** (`hooks/`) — like engram: `SessionStart` injects the Memory Protocol + recent
+  context, `SessionStart:compact` recovers context after compaction, and `UserPromptSubmit`
+  loads the `wiki_*` tools on the first message and nudges you to save when memory goes stale.
+
+Optionally add a global pointer to `~/.claude/CLAUDE.md` → see `docs/global-claude-md.md`.
 
 ## Install
 

@@ -40,6 +40,10 @@ func main() {
 		cmdMCP(os.Args[2:])
 	case "stats":
 		cmdStats(os.Args[2:])
+	case "context":
+		cmdContext(os.Args[2:])
+	case "last-activity":
+		cmdLastActivity(os.Args[2:])
 	case "graph":
 		cmdGraph(os.Args[2:])
 	case "relate":
@@ -238,7 +242,6 @@ func cmdRelate(args []string) {
 	}
 	fmt.Printf("recorded: %s %s [[%s]] — %s\n", source, relType, target, reason)
 }
-
 
 // boolFlag removes a "--name" token from args and reports whether it was present.
 func boolFlag(args []string, name string) (bool, []string) {
@@ -446,6 +449,66 @@ func humanAge(days int64) string {
 		return "today"
 	}
 	return fmt.Sprintf("%dd ago", days)
+}
+
+// cmdContext prints the L0 hot cache + the most recently touched pages, for the
+// SessionStart hook to inject. Filesystem-based so it never needs the DB.
+func cmdContext(args []string) {
+	vaultFlag, _ := flagValue(args, "vault")
+	root, err := vault.ResolveRoot(vaultFlag)
+	if err != nil {
+		return
+	}
+	if data, err := os.ReadFile(filepath.Join(root, "CLAUDE.md")); err == nil {
+		fmt.Printf("### mnemo hot cache (%s)\n\n%s\n", root, strings.TrimSpace(string(data)))
+	}
+	recent := recentPages(root, 8)
+	if len(recent) > 0 {
+		fmt.Println("\n### Recent memory")
+		for _, p := range recent {
+			desc := p.Description
+			if desc == "" {
+				desc = p.Title
+			}
+			fmt.Printf("- %s/%s — %s\n", p.Folder, p.Slug, desc)
+		}
+		fmt.Println("\nSearch deeper with the wiki_search / wiki_list tools.")
+	}
+}
+
+// cmdLastActivity prints the unix mtime of the most recently modified content
+// page (0 if none), used by the save-nudge hook.
+func cmdLastActivity(args []string) {
+	vaultFlag, _ := flagValue(args, "vault")
+	root, err := vault.ResolveRoot(vaultFlag)
+	if err != nil {
+		fmt.Println(0)
+		return
+	}
+	var newest int64
+	files, _ := vault.WalkPages(root)
+	for _, f := range files {
+		if fi, err := os.Stat(f); err == nil && fi.ModTime().Unix() > newest {
+			newest = fi.ModTime().Unix()
+		}
+	}
+	fmt.Println(newest)
+}
+
+// recentPages returns up to n content pages, newest first.
+func recentPages(root string, n int) []*vault.Page {
+	files, _ := vault.WalkPages(root)
+	var pages []*vault.Page
+	for _, f := range files {
+		if p, err := vault.ParsePage(f, root); err == nil {
+			pages = append(pages, p)
+		}
+	}
+	sort.Slice(pages, func(i, j int) bool { return pages[i].ModTime > pages[j].ModTime })
+	if len(pages) > n {
+		pages = pages[:n]
+	}
+	return pages
 }
 
 func cmdGraph(args []string) {
