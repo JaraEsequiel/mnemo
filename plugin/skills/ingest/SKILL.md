@@ -23,7 +23,8 @@ every query. Ingest integrates a source across the wiki — it does not just dum
      — **always with a reason**. If the source **contradicts** an existing page, record a
      `supersedes` or `conflicts_with` relation and surface it to the user rather than silently
      overwriting.
-4. **Refresh the index**: `mnemo index` (FTS + folder `index.md`). Skip if a watcher is running.
+4. **Refresh the index**: run `mnemo index` (rebuilds FTS + the folder `index.md` catalogs).
+   This is the deliberate moment the structure updates — there is no background watcher.
 5. **Promote** anything now central into `CLAUDE.md` (L0); keep it short.
 6. **Append to the chronicle** — add a line to `log.md`:
    `## [YYYY-MM-DD] ingest | <source title>` followed by the pages touched.

@@ -39,8 +39,8 @@ RAW (raw/, inmutable)  →  WIKI (.md por tipo, VERDAD)  →  SCHEMA.md (contrat
                               ├─ log.md (crónica append-only)
                               ▼
                      ÍNDICE FTS5 derivado (.mnemo/wiki.db, gitignored)
-                              ▲ watcher: .md cambia → reindex incremental (hash)
-                              │
+                              ▲ refresco a demanda: mnemo index / ingest / lint
+                              │  (el MCP además reindexa en cada búsqueda)
                      MCP server  ←→  cualquier agente (Claude Code, …)
 ```
 
@@ -113,11 +113,11 @@ Sirve de navegación en Obsidian **y** de tabla de ruteo barata para el agente
 ## Motor (módulo Go `mnemo`)
 
 ```
-cmd/mnemo/main.go        init|start · index · search · serve · mcp · watch · lint · graph
+cmd/mnemo/main.go        init|start · index · search · mcp · lint · graph · relate · hot
 internal/
   vault/    page.go (parse frontmatter+body+links), index.go (genera index.md), config.go
   ftsindex/ index.go (pages_fts external-content), reindex.go (incremental por hash)
-  watcher/  fsnotify → reindex debounced
+  (refresco a demanda vía `mnemo index` / ingest / lint; sin demonio en background)
   mcp/      wiki_search · wiki_get · wiki_list_index · wiki_ingest · wiki_update · wiki_lint
   scaffold/ /start (grill → config.json + SCHEMA.md + scaffold)
   outputs/  graph.json, marp, tablas (fase 2)
@@ -130,15 +130,15 @@ plugin/.claude-plugin/  plugin.json · .mcp.json
 
 `pages(path PK, slug, type, tags, title, description, body, mtime, hash)` +
 `pages_fts` FTS5 external-content sobre `(slug, title, description, tags, body)`.
-Reindex: walk vault → comparar hash → upsert cambios / borrar ausentes. Watcher dispara
-reindex incremental (debounce ~500ms). Search: BM25 + snippet, filtro por type/tags,
-fast-path exacto por slug.
+Reindex: walk vault → comparar hash → upsert cambios / borrar ausentes. Se dispara a demanda
+(`mnemo index`, `/mnemo:ingest`, `/mnemo:lint`) y en cada búsqueda del MCP. Search: BM25 +
+snippet, filtro por type/tags, fast-path exacto por slug.
 
 ## Plan de entrega (slices verticales)
 
 1. ✅ **Esqueleto + índice + search (CLI)** — `mnemo init/index/search`, FTS5 BM25 + snippet, reindex incremental por hash.
 2. ✅ **`index.md` jerárquico** — `GenerateIndexes`: catálogo `slug → descripción` por carpeta + raíz, escritura idempotente. Fundido en `mnemo index`; comando `mnemo indexes`.
-3. ✅ **Watcher** — `internal/watcher` (fsnotify, recursivo, debounce) → reindex + regenera catálogos. `mnemo watch`.
+3. ✅ **Refresco a demanda** — sin demonio en background (el watcher se eliminó por simplicidad): el índice + catálogos se regeneran con `mnemo index` / `/mnemo:ingest` / `/mnemo:lint`, y el MCP reindexa en cada búsqueda. Modelo deliberado estilo LLM-Wiki: vuelcas crudo → decides cuándo procesarlo.
 4. ✅ **MCP server** — `internal/mcp` (mcp-go v0.44.0): `wiki_search`, `wiki_get`, `wiki_list` por stdio. `mnemo mcp`. Probado con JSON-RPC real.
 5. ✅ **Plugin + skills** — `plugin/.claude-plugin/plugin.json`, `.mcp.json`, skills `mnemo-maintainer` (contrato siempre activo, incl. L0=CLAUDE.md promote/demote), `/start`, `/ingest`, `/query`, `/lint`.
 6. 🟡 **Fase 2 (en curso)**:

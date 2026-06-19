@@ -45,8 +45,9 @@ and a starter `CLAUDE.md` (L0 hot cache, ~50–100 lines).
 mnemo index --vault <path>       # builds the FTS5 index + every folder's index.md
 ```
 
-Suggest running `mnemo watch --vault <path>` (or wiring it via the OS scheduler) so the index
-stays current as files change.
+The index refreshes on demand — re-run `mnemo index` (or `/mnemo:ingest` / `/mnemo:lint`) after
+editing markdown directly. The MCP server also reindexes on every search, so agent recall is
+always fresh. There is no background watcher to manage.
 
 ## Notes
 
