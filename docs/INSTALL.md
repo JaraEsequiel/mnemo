@@ -107,8 +107,9 @@ encuentre tu vault **desde cualquier directorio**.
 ## 4. (Opcional) Extras
 
 ```bash
-# Auto-reindex al guardar cualquier .md (déjalo corriendo)
-mnemo watch --vault ~/brain &
+# Refrescar el índice + catálogos a demanda (tras editar markdown a mano)
+mnemo index --vault ~/brain
+#  …o deja que /mnemo:ingest y /mnemo:lint lo hagan. El MCP además reindexa en cada búsqueda.
 
 # Juez de contradicciones headless (sin agente activo)
 export MNEMO_AGENT_CLI=claude

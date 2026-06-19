@@ -53,7 +53,8 @@ topic evolves; create a new page for a genuinely new topic.
 ## Keep the catalogs and index current
 
 - After adding/renaming/removing pages, run `mnemo index` (rebuilds FTS + every folder's
-  `index.md`). If a watcher is running (`mnemo watch`) this happens automatically on save.
+  `index.md`). This is on demand — there is no background watcher. (The MCP server also
+  reindexes the FTS on every search, so recall stays fresh even before you run `mnemo index`.)
 - **Never hand-edit `index.md`** — it is generated from each page's `description:`.
 
 ## Relations (the knowledge graph)

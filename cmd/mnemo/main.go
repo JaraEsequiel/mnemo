@@ -5,12 +5,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/JaraEsequiel/mnemo/internal/ftsindex"
@@ -19,7 +17,6 @@ import (
 	mnemomcp "github.com/JaraEsequiel/mnemo/internal/mcp"
 	"github.com/JaraEsequiel/mnemo/internal/setup"
 	"github.com/JaraEsequiel/mnemo/internal/vault"
-	"github.com/JaraEsequiel/mnemo/internal/watcher"
 
 	"github.com/mattn/go-isatty"
 )
@@ -39,8 +36,6 @@ func main() {
 		cmdIndexes(os.Args[2:])
 	case "search":
 		cmdSearch(os.Args[2:])
-	case "watch":
-		cmdWatch(os.Args[2:])
 	case "mcp":
 		cmdMCP(os.Args[2:])
 	case "stats":
@@ -80,7 +75,6 @@ Usage:
   mnemo index   [--vault DIR]                 Reindex into FTS5 + regenerate folder index.md
   mnemo indexes [--vault DIR]                 Regenerate folder index.md catalogs only
   mnemo search  <query> [--vault DIR] [--type T] [--limit N]
-  mnemo watch   [--vault DIR] [--debounce MS] Reindex automatically on markdown change
   mnemo mcp     [--vault DIR]                 Run the MCP server over stdio
   mnemo stats   [--vault DIR]                 Show vault statistics
   mnemo graph   [--vault DIR] [--mode preserve|force|skip]   Write Obsidian graph.json
@@ -155,27 +149,6 @@ func cmdIndexes(args []string) {
 		fatal("generate indexes: %v", err)
 	}
 	fmt.Printf("index.md: folders=%d written=%d\n", im.Folders, im.Written)
-}
-
-func cmdWatch(args []string) {
-	vaultFlag, args := flagValue(args, "vault")
-	debounceStr, _ := flagValue(args, "debounce")
-	debounce := 500 * time.Millisecond
-	if debounceStr != "" {
-		if ms, err := strconv.Atoi(debounceStr); err == nil {
-			debounce = time.Duration(ms) * time.Millisecond
-		}
-	}
-	root, idx := openVault(vaultFlag)
-	defer idx.Close()
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	fmt.Fprintf(os.Stderr, "mnemo watching %s (debounce %s) — Ctrl+C to stop\n", root, debounce)
-	if err := watcher.Run(ctx, root, idx, debounce); err != nil {
-		fatal("watch: %v", err)
-	}
 }
 
 func cmdMCP(args []string) {

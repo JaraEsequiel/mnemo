@@ -12,8 +12,8 @@ RAW (raw/, immutable)  →  WIKI (.md by type, TRUTH)  →  SCHEMA.md + CLAUDE.m
                               │ index.md per folder (slug → description) · log.md chronicle
                               ▼
                        FTS5 derived index (.mnemo/wiki.db, gitignored)
-                              ▲ watcher: .md change → incremental reindex (by hash)
-                              │
+                              ▲ refresh on demand: mnemo index / ingest / lint
+                              │  (the MCP server also reindexes on every search)
                        MCP server  ←→  any agent (Claude Code, …)
 ```
 
@@ -30,7 +30,6 @@ mnemo init    --vault DIR              # scaffold a vault (.mnemo/, type folders
 mnemo index   --vault DIR              # reindex FTS5 + regenerate every folder's index.md
 mnemo indexes --vault DIR              # regenerate folder index.md catalogs only
 mnemo search  <query> --vault DIR [--type T] [--limit N]
-mnemo watch   --vault DIR [--debounce MS]   # auto-reindex on markdown change
 mnemo mcp     --vault DIR              # MCP server over stdio
 mnemo stats   --vault DIR
 mnemo graph   --vault DIR [--mode preserve|force|skip]   # Obsidian graph.json
@@ -62,8 +61,10 @@ The vault is resolved by walking up for a `.mnemo/` directory, so inside a vault
   generates per-folder `index.md` catalogs. Markdown is authoritative.
 - **ftsindex** (`internal/ftsindex`) — derived SQLite/FTS5 index; BM25 search with snippets;
   incremental reindex keyed by file hash.
-- **watcher** (`internal/watcher`) — fsnotify; debounced reindex + catalog refresh on change.
-- **mcp** (`internal/mcp`) — `wiki_search`, `wiki_get`, `wiki_list` over stdio.
+- **mcp** (`internal/mcp`) — `wiki_search`, `wiki_get`, `wiki_list` over stdio; reindexes on each search.
+
+The index refreshes on demand — `mnemo index`, `/mnemo:ingest`, or `/mnemo:lint` — and the MCP
+server reindexes on every search, so agent recall is always fresh. There is no background daemon.
 
 ## Memory levels
 
