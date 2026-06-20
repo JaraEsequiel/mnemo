@@ -29,5 +29,5 @@ something non-obvious, or change a project's status? If yes → save it to mnemo
 PROTOCOL
 
 # Best-effort recent context — never fail the hook.
-mnemo context 2>/dev/null || true
+"${MNEMO_BIN:-mnemo}" context 2>/dev/null || true
 exit 0

@@ -72,6 +72,37 @@ Y deja todo hecho — **sin `export` ni copiar-pegar**:
 
 ---
 
+## 1-ter. Instalación para Cowork (Claude Code cloud/sandbox)
+
+En Cowork **el home (`~/.claude`, `~/.local/bin`) es efímero — solo persiste la carpeta de
+trabajo**. Por eso la instalación local (user-scope) no sirve ahí: hay que dejar todo
+**project-scope dentro de la carpeta** que Cowork abre.
+
+```bash
+mnemo setup --cowork --target /ruta/a/tu/carpeta
+```
+
+Escribe, sin tocar tu home:
+
+```
+<carpeta>/
+├── .mcp.json               mnemo · MNEMO_VAULT=${CLAUDE_PROJECT_DIR:-.}/Memory
+├── .claude/
+│   ├── settings.json       hooks (Memory Protocol, carga de tools, nudges)
+│   ├── skills/mnemo-*/      las skills → /mnemo-maintainer, /mnemo-start, …
+│   └── mnemo-hooks/*.sh     los scripts de hook
+├── Memory/                 el vault
+├── .mnemo-bin/mnemo        el binario (se sincroniza Linux↔Ubuntu)
+├── CLAUDE.md               sección mnemo + @Memory/CLAUDE.md (no pisa lo tuyo)
+└── .gitignore              ignora el binario + el índice
+```
+
+Apunta Cowork a esa carpeta y la sesión levanta todo desde ahí (sin trust-gate). El `.mcp.json`,
+los hooks y las skills se cargan solos; el binario corre desde `.mnemo-bin/` vía ruta relativa.
+
+> El binario copiado es **linux/amd64**. Desde otro OS, recompílalo en la carpeta
+> (`go build -o <carpeta>/.mnemo-bin/mnemo ./cmd/mnemo`) o usa un hook `SessionStart` que lo build.
+
 ## 2. Lanzar Claude Code en el vault
 
 El hot cache **L0 es el `CLAUDE.md`** del vault, que Claude Code carga solo:

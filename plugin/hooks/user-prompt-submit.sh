@@ -22,7 +22,7 @@ if [[ ! -f "$STATE" ]]; then
 fi
 
 # ── Subsequent messages: best-effort save nudge ───────────────────────────────
-LAST="$(mnemo last-activity 2>/dev/null)"
+LAST="$("${MNEMO_BIN:-mnemo}" last-activity 2>/dev/null)"
 NOW="$(date +%s 2>/dev/null)"
 NUDGE="${STATE%-init}-nudge"
 

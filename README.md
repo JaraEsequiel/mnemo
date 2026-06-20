@@ -115,6 +115,15 @@ claude plugin install mnemo
 Then start Claude Code and run `/mnemo:start` to tailor your vault, or just ask it to
 remember/recall things. Full guide + manual steps → **`docs/INSTALL.md`**.
 
+**Cowork / cloud sandbox** (where `~/` is ephemeral and only the working folder persists):
+
+```bash
+mnemo setup --cowork --target <folder>   # writes project-scoped config into the folder
+```
+
+This drops `.mcp.json`, `.claude/` (skills + hooks), the `Memory/` vault, and the binary into
+the folder so a cloud session loads everything from there. See `docs/INSTALL.md`.
+
 > **Contributors / from source:** `./install.sh` builds the binary and runs the setup wizard.
 
 ## Design docs

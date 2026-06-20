@@ -73,8 +73,9 @@ func usage() {
 	fmt.Print(`mnemo — markdown-first knowledge memory
 
 Usage:
-  mnemo setup   [--vault DIR] [--scope S] [--plugin-src DIR] [--skills-dest DIR] [--yes] [--no-mcp] [--no-graph]
+  mnemo setup   [--vault DIR] [--scope S] [--yes] [--no-mcp] [--no-graph]
                                               Interactive installer (vault + index + skills + MCP)
+  mnemo setup --cowork [--target DIR]         Write project-scoped config into a folder for Cowork
   mnemo init    [--vault DIR]                 Scaffold a vault (.mnemo/, folders, L0/log)
   mnemo index   [--vault DIR]                 Reindex into FTS5 + regenerate folder index.md
   mnemo indexes [--vault DIR]                 Regenerate folder index.md catalogs only
@@ -618,13 +619,36 @@ func cmdInit(args []string) {
 }
 
 func cmdSetup(args []string) {
+	cowork, args := boolFlag(args, "--cowork")
 	yes, args := boolFlag(args, "--yes")
 	noMCP, args := boolFlag(args, "--no-mcp")
 	noGraph, args := boolFlag(args, "--no-graph")
 	vaultFlag, args := flagValue(args, "vault")
 	scope, args := flagValue(args, "scope")
 	pluginSrc, args := flagValue(args, "plugin-src")
-	skillsDest, _ := flagValue(args, "skills-dest")
+	skillsDest, args := flagValue(args, "skills-dest")
+	target, _ := flagValue(args, "target")
+
+	resolvedPluginSrc := pluginSrc
+	if resolvedPluginSrc == "" {
+		if exe, err := os.Executable(); err == nil {
+			guess := filepath.Join(filepath.Dir(exe), "..", "plugin")
+			if fi, err := os.Stat(guess); err == nil && fi.IsDir() {
+				resolvedPluginSrc = guess
+			}
+		}
+	}
+
+	// ── Cowork mode: write project-scoped config into the target folder ──────────
+	if cowork {
+		if target == "" {
+			target = "."
+		}
+		if err := setup.RunCowork(setup.Options{Target: target, PluginSrc: resolvedPluginSrc}, os.Stdout); err != nil {
+			fatal("setup --cowork: %v", err)
+		}
+		return
+	}
 
 	home, _ := os.UserHomeDir()
 	defVault := vaultFlag
@@ -634,20 +658,11 @@ func cmdSetup(args []string) {
 	if scope == "" {
 		scope = "user"
 	}
-	if pluginSrc == "" {
-		// Default to the plugin/ dir next to the running binary's repo, if present.
-		if exe, err := os.Executable(); err == nil {
-			guess := filepath.Join(filepath.Dir(exe), "..", "plugin")
-			if fi, err := os.Stat(guess); err == nil && fi.IsDir() {
-				pluginSrc = guess
-			}
-		}
-	}
 
 	opts := setup.Options{
 		Vault:       defVault,
 		Scope:       scope,
-		PluginSrc:   pluginSrc,
+		PluginSrc:   resolvedPluginSrc,
 		SkillsDest:  skillsDest,
 		WriteGraph:  !noGraph,
 		RegisterMCP: !noMCP,
