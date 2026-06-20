@@ -70,12 +70,12 @@ func RunCowork(opts Options, out io.Writer) error {
 	}
 	fmt.Fprintf(out, "✓ .mcp.json (mnemo, vault relative to the folder)\n")
 
-	// 4. Skills as project skills: .claude/skills/mnemo-*
-	n, err := installCoworkSkills(opts.PluginSrc, target)
+	// 4. Skills in Skills/ (referenced from the CLAUDE.md Skill-Registry).
+	skills, err := installCoworkSkills(opts.PluginSrc, target)
 	if err != nil {
 		fmt.Fprintf(out, "! skills not installed: %v\n", err)
 	} else {
-		fmt.Fprintf(out, "✓ %d skills in .claude/skills/ (/mnemo-maintainer, /mnemo-start, …)\n", n)
+		fmt.Fprintf(out, "✓ %d skills in Skills/ (registry in CLAUDE.md)\n", len(skills))
 	}
 
 	// 5. Hooks: scripts in .claude/mnemo-hooks/ + entries merged into settings.json.
@@ -85,9 +85,9 @@ func RunCowork(opts Options, out io.Writer) error {
 		fmt.Fprintf(out, "✓ hooks in .claude/settings.json (Memory Protocol, tool loading, nudges)\n")
 	}
 
-	// 6. Root CLAUDE.md mnemo section (loads the L0 hot cache + protocol pointer).
-	if err := writeCoworkClaudeMd(target); err == nil {
-		fmt.Fprintf(out, "✓ CLAUDE.md mnemo section (imports Memory/CLAUDE.md)\n")
+	// 6. Root CLAUDE.md: load-L0 instruction + maintenance contract + Skill-Registry.
+	if err := writeCoworkClaudeMd(target, skills); err == nil {
+		fmt.Fprintf(out, "✓ CLAUDE.md (loads L0 from Memory/CLAUDE.md + Skill-Registry)\n")
 	}
 
 	// 7. .gitignore the binary + derived index in case the folder is a git repo.
@@ -135,51 +135,58 @@ func writeCoworkMCP(target string) error {
 	return writeJSON(path, root)
 }
 
-// installCoworkSkills copies each plugin skill to .claude/skills/mnemo-<name>,
-// rewriting its frontmatter name to match (so it loads as /mnemo-<name>).
-func installCoworkSkills(pluginSrc, target string) (int, error) {
+type skillInfo struct{ Name, Desc, Path string }
+
+// installCoworkSkills copies each plugin skill into <target>/Skills/<name>/SKILL.md
+// — a visible registry referenced from the root CLAUDE.md. Returns the skills so
+// the CLAUDE.md Skill-Registry can list them with their triggers.
+func installCoworkSkills(pluginSrc, target string) ([]skillInfo, error) {
 	srcDir := filepath.Join(pluginSrc, "skills")
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	count := 0
+	var skills []skillInfo
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
 		}
-		name := e.Name()
-		newName := name
-		if !strings.HasPrefix(name, "mnemo") {
-			newName = "mnemo-" + name
-		}
-		data, err := os.ReadFile(filepath.Join(srcDir, name, "SKILL.md"))
+		name := strings.TrimPrefix(e.Name(), "mnemo-") // maintainer, start, ingest, query, lint
+		data, err := os.ReadFile(filepath.Join(srcDir, e.Name(), "SKILL.md"))
 		if err != nil {
 			continue
 		}
-		patched := rewriteSkillName(string(data), newName)
-		dst := filepath.Join(target, ".claude", "skills", newName, "SKILL.md")
+		rel := "Skills/" + name + "/SKILL.md"
+		dst := filepath.Join(target, "Skills", name, "SKILL.md")
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return count, err
+			return skills, err
 		}
-		if err := os.WriteFile(dst, []byte(patched), 0o644); err != nil {
-			return count, err
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return skills, err
 		}
-		count++
+		skills = append(skills, skillInfo{Name: name, Desc: skillDescription(string(data)), Path: rel})
 	}
-	return count, nil
+	return skills, nil
 }
 
-// rewriteSkillName replaces the `name:` frontmatter field with newName.
-func rewriteSkillName(md, newName string) string {
-	lines := strings.Split(md, "\n")
-	for i, l := range lines {
-		if strings.HasPrefix(strings.TrimSpace(l), "name:") {
-			lines[i] = "name: " + newName
-			break
+// skillDescription extracts the frontmatter description from a SKILL.md.
+func skillDescription(md string) string {
+	for _, l := range strings.Split(md, "\n") {
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "description:") {
+			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(t, "description:")), `"`)
 		}
 	}
-	return strings.Join(lines, "\n")
+	return ""
+}
+
+func tableCell(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "|", "\\|")
+	if len(s) > 130 {
+		s = s[:127] + "…"
+	}
+	return s
 }
 
 func installCoworkHooks(pluginSrc, target string) error {
@@ -265,20 +272,45 @@ func dropMnemoEntries(arr []any) []any {
 	return out
 }
 
-func writeCoworkClaudeMd(target string) error {
+func writeCoworkClaudeMd(target string, skills []skillInfo) error {
 	path := filepath.Join(target, "CLAUDE.md")
 	const begin = "<!-- mnemo:begin -->"
 	const end = "<!-- mnemo:end -->"
-	block := begin + "\n## mnemo — knowledge memory\n\n" +
-		"You have **mnemo** (MCP server `mnemo`, vault in `Memory/`). Recall with `wiki_search`/" +
-		"`wiki_list` before answering past-work questions, and **save proactively** — after any " +
-		"decision, bugfix, discovery, idea, or project change, create/update a page (see the " +
-		"`mnemo-maintainer` skill). The markdown is the source of truth.\n\n@Memory/CLAUDE.md\n" + end
+
+	var sb strings.Builder
+	sb.WriteString(begin + "\n# mnemo — knowledge memory\n\n")
+
+	sb.WriteString("## Load your memory first\n")
+	sb.WriteString("Your **L0 hot cache** is `Memory/CLAUDE.md` (top entities, active projects, current " +
+		"context). It is imported below — keep it in context every session. The full knowledge vault lives " +
+		"in `Memory/` and the markdown is the source of truth. Recall with the `wiki_search` / `wiki_list` / " +
+		"`wiki_get` MCP tools before answering anything that touches past work.\n\n@Memory/CLAUDE.md\n\n")
+
+	sb.WriteString("## Memory maintenance (always active)\n")
+	sb.WriteString("**Save proactively — do not wait to be asked.** After a decision, a bug fixed, a " +
+		"non-obvious discovery, a convention, a new idea/proposal, or a project status change: create or " +
+		"update a page in `Memory/<type>/` with frontmatter (slug/title/type/tags/description) and a " +
+		"What/Why/Where/Learned body. Tag the context (#work / #personal). After a decision/architecture " +
+		"page, run `wiki_candidates` and record real relationships with `wiki_relate` (always with a " +
+		"reason). Never hand-edit `Memory/.mnemo/wiki.db`. Full rules: `Skills/maintainer/SKILL.md`.\n\n")
+
+	sb.WriteString("## Skill-Registry\n")
+	sb.WriteString("These skills live in `Skills/`. Load one by **reading its file** when its trigger " +
+		"matches:\n\n| Skill | When to use | File |\n|-------|-------------|------|\n")
+	for _, s := range skills {
+		sb.WriteString(fmt.Sprintf("| %s | %s | `%s` |\n", s.Name, tableCell(s.Desc), s.Path))
+	}
+	sb.WriteString(end)
+	block := sb.String()
 
 	existing, _ := os.ReadFile(path)
 	content := string(existing)
-	if strings.Contains(content, begin) {
-		return nil // already present
+	// Replace an existing mnemo block (idempotent) or append below the user's content.
+	if i := strings.Index(content, begin); i >= 0 {
+		if j := strings.Index(content, end); j >= i {
+			content = content[:i] + block + content[j+len(end):]
+			return os.WriteFile(path, []byte(content), 0o644)
+		}
 	}
 	if content != "" && !strings.HasSuffix(content, "\n") {
 		content += "\n"

@@ -39,10 +39,15 @@ func ResolveRoot(flag string) (string, error) {
 	if env := strings.TrimSpace(os.Getenv("MNEMO_VAULT")); env != "" {
 		return filepath.Abs(env)
 	}
+	// configDir is mnemo's own state dir (~/.mnemo). It shares the `.mnemo` name
+	// with the vault marker, so the cwd walk must skip it — otherwise running
+	// from anywhere under $HOME would resolve $HOME as the vault.
+	configDir := filepath.Clean(filepath.Dir(ActiveVaultPointer()))
 	if cwd, err := os.Getwd(); err == nil {
 		dir := cwd
 		for {
-			if fi, err := os.Stat(filepath.Join(dir, ".mnemo")); err == nil && fi.IsDir() {
+			candidate := filepath.Join(dir, ".mnemo")
+			if fi, err := os.Stat(candidate); err == nil && fi.IsDir() && filepath.Clean(candidate) != configDir {
 				return dir, nil
 			}
 			parent := filepath.Dir(dir)
