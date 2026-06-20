@@ -20,10 +20,11 @@ var ignoredDirs = map[string]bool{
 // ignoredFiles are not indexed as wiki content: catalogs, the chronicle, and
 // the meta/hot-cache files (CLAUDE.md = L0, SCHEMA.md = the contract).
 var ignoredFiles = map[string]bool{
-	"index.md":  true,
-	"log.md":    true,
-	"claude.md": true,
-	"schema.md": true,
+	"index.md":   true,
+	"log.md":     true,
+	"claude.md":  true,
+	"schema.md":  true,
+	"working.md": true, // L1 scratchpad, not a wiki page
 }
 
 // ResolveRoot returns the vault root. Precedence: the explicit flag, the

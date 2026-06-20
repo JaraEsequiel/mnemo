@@ -18,5 +18,5 @@ Keep saving proactively from here on: after any decision, bugfix, discovery, ide
 status change, write it to mnemo.
 PROTOCOL
 
-mnemo context 2>/dev/null || true
+"${MNEMO_BIN:-mnemo}" context 2>/dev/null || true
 exit 0
