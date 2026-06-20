@@ -670,8 +670,7 @@ func cmdSetup(args []string) {
 		Target:      target,
 	}
 
-	// Interactive wizard unless --yes was given. Require a real terminal so a
-	// piped/CI invocation fails fast instead of hanging on the TUI.
+	// ── Interactive wizard: pick one or more platforms ──────────────────────────
 	if !yes {
 		if !isatty.IsTerminal(os.Stdin.Fd()) && !isatty.IsCygwinTerminal(os.Stdin.Fd()) {
 			fatal("setup needs a terminal; for non-interactive install pass --yes (local) or --cowork --target")
@@ -680,24 +679,32 @@ func cmdSetup(args []string) {
 		if err != nil {
 			fatal("%v", err)
 		}
-		// Preserve non-interactive fields the wizard doesn't ask about.
-		chosen.PluginSrc = opts.PluginSrc
-		chosen.SkillsDest = opts.SkillsDest
-		if noMCP {
-			chosen.RegisterMCP = false
-		}
-		opts = chosen
-	}
-
-	// The wizard (or the --cowork flag handled above) may select cowork mode.
-	if opts.Cowork {
-		if err := setup.RunCowork(opts, os.Stdout); err != nil {
-			fatal("setup --cowork: %v", err)
+		for i, o := range chosen {
+			o.PluginSrc = opts.PluginSrc
+			o.SkillsDest = opts.SkillsDest
+			if noMCP && !o.Cowork {
+				o.RegisterMCP = false
+			}
+			if i > 0 {
+				fmt.Println()
+			}
+			runOneSetup(o)
 		}
 		return
 	}
 
-	if err := setup.Run(opts, os.Stdout); err != nil {
+	// ── Headless: --yes installs Local with the given flags ─────────────────────
+	runOneSetup(opts)
+}
+
+func runOneSetup(o setup.Options) {
+	if o.Cowork {
+		if err := setup.RunCowork(o, os.Stdout); err != nil {
+			fatal("setup --cowork: %v", err)
+		}
+		return
+	}
+	if err := setup.Run(o, os.Stdout); err != nil {
 		fatal("setup: %v", err)
 	}
 }

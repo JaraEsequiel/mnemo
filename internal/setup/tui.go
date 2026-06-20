@@ -19,10 +19,17 @@ var (
 
 type labeledChoice struct{ name, desc string }
 
-var modeChoices = []labeledChoice{
-	{"Local", "install into this machine (~/.claude, MCP user-scope)"},
-	{"Cowork", "write project-scoped config into a folder (cloud/sandbox)"},
+// targetChoices is the (extensible) list of install platforms. Add a new target
+// here, give it its own config step(s), and append its Options in buildResults.
+var targetChoices = []labeledChoice{
+	{"Local", "this machine (~/.claude, MCP user-scope)"},
+	{"Cowork", "project-scoped config in a folder (cloud/sandbox)"},
 }
+
+const (
+	targetLocal = iota
+	targetCowork
+)
 
 var scopeChoices = []labeledChoice{
 	{"user", "all your projects (recommended)"},
@@ -32,27 +39,31 @@ var scopeChoices = []labeledChoice{
 
 // wizard steps.
 const (
-	stepMode = iota
-	stepPath // vault path (local) or target folder (cowork)
-	stepScope
+	stepTargets = iota
+	stepLocalPath
+	stepLocalScope
+	stepCoworkPath
 	stepConfirm
 )
 
 type wizard struct {
-	step      int
-	modeIdx   int // 0 = local, 1 = cowork
-	ti        textinput.Model
-	scopeIdx  int
-	graph     bool
-	base      Options
-	localDef  string // default vault path for local
-	coworkDef string // default target folder for cowork
-	result    *Options
+	step         int
+	cursor       int          // cursor in the targets multi-select
+	selected     map[int]bool // which targets are checked
+	ti           textinput.Model
+	scopeIdx     int
+	graph        bool
+	localVault   string
+	coworkTarget string
+	base         Options
+	localDef     string
+	coworkDef    string
+	results      []Options
+	confirmed    bool
 }
 
 func newWizard(def Options) wizard {
 	ti := textinput.New()
-	ti.Focus()
 	ti.CharLimit = 512
 	ti.Width = 50
 	cwd, _ := os.Getwd()
@@ -60,10 +71,15 @@ func newWizard(def Options) wizard {
 	if coworkDef == "" {
 		coworkDef = cwd
 	}
-	return wizard{ti: ti, base: def, graph: true, localDef: def.Vault, coworkDef: coworkDef}
+	return wizard{
+		ti:        ti,
+		base:      def,
+		graph:     true,
+		selected:  map[int]bool{targetLocal: true}, // Local pre-checked
+		localDef:  def.Vault,
+		coworkDef: coworkDef,
+	}
 }
-
-func (w *wizard) cowork() bool { return w.modeIdx == 1 }
 
 func (w wizard) Init() tea.Cmd { return textinput.Blink }
 
@@ -82,22 +98,24 @@ func (w wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch w.step {
-	case stepMode:
+	case stepTargets:
 		switch key.String() {
 		case "up", "k":
-			if w.modeIdx > 0 {
-				w.modeIdx--
+			if w.cursor > 0 {
+				w.cursor--
 			}
 		case "down", "j":
-			if w.modeIdx < len(modeChoices)-1 {
-				w.modeIdx++
+			if w.cursor < len(targetChoices)-1 {
+				w.cursor++
 			}
+		case " ", "x":
+			w.selected[w.cursor] = !w.selected[w.cursor]
 		}
-	case stepPath:
+	case stepLocalPath, stepCoworkPath:
 		var cmd tea.Cmd
 		w.ti, cmd = w.ti.Update(msg)
 		return w, cmd
-	case stepScope:
+	case stepLocalScope:
 		switch key.String() {
 		case "up", "k":
 			if w.scopeIdx > 0 {
@@ -109,7 +127,7 @@ func (w wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case stepConfirm:
-		if !w.cowork() && key.String() == "g" {
+		if w.selected[targetLocal] && key.String() == "g" {
 			w.graph = !w.graph
 		}
 	}
@@ -118,77 +136,130 @@ func (w wizard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (w wizard) advance() (tea.Model, tea.Cmd) {
 	switch w.step {
-	case stepMode:
-		// Seed the path input with the right default for the chosen mode.
-		if w.cowork() {
-			w.ti.SetValue(w.coworkDef)
-		} else {
-			w.ti.SetValue(w.localDef)
+	case stepTargets:
+		if !w.selected[targetLocal] && !w.selected[targetCowork] {
+			return w, nil // require at least one
 		}
-		w.step = stepPath
-	case stepPath:
+		return w.goTo(stepLocalPath), nil
+	case stepLocalPath:
 		if strings.TrimSpace(w.ti.Value()) == "" {
 			return w, nil
 		}
-		if w.cowork() {
-			w.step = stepConfirm // cowork has no MCP scope
-		} else {
-			w.step = stepScope
+		w.localVault = strings.TrimSpace(w.ti.Value())
+		return w.goTo(stepLocalScope), nil
+	case stepLocalScope:
+		return w.goTo(stepCoworkPath), nil
+	case stepCoworkPath:
+		if strings.TrimSpace(w.ti.Value()) == "" {
+			return w, nil
 		}
-	case stepScope:
-		w.step = stepConfirm
+		w.coworkTarget = strings.TrimSpace(w.ti.Value())
+		return w.goTo(stepConfirm), nil
 	case stepConfirm:
-		o := w.base
-		if w.cowork() {
-			o.Cowork = true
-			o.Target = strings.TrimSpace(w.ti.Value())
-		} else {
-			o.Vault = strings.TrimSpace(w.ti.Value())
-			o.Scope = scopeChoices[w.scopeIdx].name
-			o.WriteGraph = w.graph
-			o.RegisterMCP = true
-		}
-		w.result = &o
+		w.confirmed = true
+		w.results = w.buildResults()
 		return w, tea.Quit
 	}
 	return w, nil
+}
+
+// goTo moves to step, skipping steps whose target isn't selected and seeding the
+// text input where needed.
+func (w wizard) goTo(step int) wizard {
+	for ; step < stepConfirm; step++ {
+		switch step {
+		case stepLocalPath:
+			if w.selected[targetLocal] {
+				w.ti.SetValue(w.localDef)
+				w.ti.Focus()
+				w.step = step
+				return w
+			}
+		case stepLocalScope:
+			if w.selected[targetLocal] {
+				w.step = step
+				return w
+			}
+		case stepCoworkPath:
+			if w.selected[targetCowork] {
+				w.ti.SetValue(w.coworkDef)
+				w.ti.Focus()
+				w.step = step
+				return w
+			}
+		}
+	}
+	w.step = stepConfirm
+	return w
+}
+
+func (w wizard) buildResults() []Options {
+	var out []Options
+	if w.selected[targetLocal] {
+		o := w.base
+		o.Vault = w.localVault
+		o.Scope = scopeChoices[w.scopeIdx].name
+		o.WriteGraph = w.graph
+		o.RegisterMCP = true
+		o.Cowork = false
+		o.Target = ""
+		out = append(out, o)
+	}
+	if w.selected[targetCowork] {
+		o := w.base
+		o.Cowork = true
+		o.Target = w.coworkTarget
+		out = append(out, o)
+	}
+	return out
 }
 
 func (w wizard) View() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("mnemo setup") + "\n\n")
 	switch w.step {
-	case stepMode:
-		b.WriteString("Install target:\n\n")
-		renderChoices(&b, modeChoices, w.modeIdx)
-		b.WriteString("\n" + hintStyle.Render("↑/↓ to choose · enter to continue · esc to cancel"))
-	case stepPath:
-		if w.cowork() {
-			b.WriteString("Folder to make Cowork-ready:\n")
-		} else {
-			b.WriteString("Where should your vault live?\n")
+	case stepTargets:
+		b.WriteString("Install for which platform(s)?  (space to toggle, one or more)\n\n")
+		for i, c := range targetChoices {
+			cursor := "  "
+			if i == w.cursor {
+				cursor = cursorStyle.Render("▸ ")
+			}
+			box := "[ ]"
+			if w.selected[i] {
+				box = "[x]"
+			}
+			line := fmt.Sprintf("%s %s — %s", box, c.name, c.desc)
+			if w.selected[i] {
+				line = choiceStyle.Render(line)
+			}
+			b.WriteString(cursor + line + "\n")
 		}
+		b.WriteString("\n" + hintStyle.Render("↑/↓ move · space toggle · enter continue · esc cancel"))
+	case stepLocalPath:
+		b.WriteString("Local — where should your vault live?\n")
 		b.WriteString(w.ti.View() + "\n\n")
 		b.WriteString(hintStyle.Render("enter to continue · esc to cancel"))
-	case stepScope:
-		b.WriteString("MCP server scope:\n\n")
+	case stepLocalScope:
+		b.WriteString("Local — MCP server scope:\n\n")
 		renderChoices(&b, scopeChoices, w.scopeIdx)
 		b.WriteString("\n" + hintStyle.Render("↑/↓ to choose · enter to continue"))
+	case stepCoworkPath:
+		b.WriteString("Cowork — folder to make Cowork-ready:\n")
+		b.WriteString(w.ti.View() + "\n\n")
+		b.WriteString(hintStyle.Render("enter to continue · esc to cancel"))
 	case stepConfirm:
 		b.WriteString("Ready to install:\n\n")
-		if w.cowork() {
-			fmt.Fprintf(&b, "  mode:    Cowork (project-scoped, no ~/ changes)\n")
-			fmt.Fprintf(&b, "  folder:  %s\n", strings.TrimSpace(w.ti.Value()))
-			fmt.Fprintf(&b, "  writes:  .mcp.json · .claude/{skills,settings,hooks} · Memory/ · .mnemo-bin/\n")
-		} else {
+		if w.selected[targetLocal] {
 			graph := "yes"
 			if !w.graph {
 				graph = "no"
 			}
-			fmt.Fprintf(&b, "  mode:    Local\n")
-			fmt.Fprintf(&b, "  vault:   %s\n", strings.TrimSpace(w.ti.Value()))
-			fmt.Fprintf(&b, "  scope:   %s\n", scopeChoices[w.scopeIdx].name)
-			fmt.Fprintf(&b, "  graph:   %s  %s\n", graph, hintStyle.Render("(press g to toggle)"))
+			fmt.Fprintf(&b, "  Local   vault=%s · scope=%s · graph=%s %s\n",
+				w.localVault, scopeChoices[w.scopeIdx].name, graph, hintStyle.Render("(g toggles graph)"))
+		}
+		if w.selected[targetCowork] {
+			fmt.Fprintf(&b, "  Cowork  folder=%s\n", w.coworkTarget)
 		}
 		b.WriteString("\n" + hintStyle.Render("enter to install · esc to cancel"))
 	}
@@ -208,17 +279,16 @@ func renderChoices(b *strings.Builder, choices []labeledChoice, idx int) {
 	}
 }
 
-// RunWizard launches the interactive setup TUI, returning the chosen Options.
-// def supplies defaults (vault path, target, plugin source, skills dest).
-// Returns an error if the user cancels.
-func RunWizard(def Options) (Options, error) {
+// RunWizard launches the interactive setup TUI, returning one Options per
+// selected platform (Local and/or Cowork). Returns an error if cancelled.
+func RunWizard(def Options) ([]Options, error) {
 	m, err := tea.NewProgram(newWizard(def)).Run()
 	if err != nil {
-		return Options{}, err
+		return nil, err
 	}
 	w, _ := m.(wizard)
-	if w.result == nil {
-		return Options{}, fmt.Errorf("setup cancelled")
+	if !w.confirmed || len(w.results) == 0 {
+		return nil, fmt.Errorf("setup cancelled")
 	}
-	return *w.result, nil
+	return w.results, nil
 }
