@@ -76,6 +76,7 @@ Usage:
   mnemo setup   [--vault DIR] [--scope S] [--yes] [--no-mcp] [--no-graph]
                                               Interactive installer (vault + index + skills + MCP)
   mnemo setup --cowork [--target DIR]         Write project-scoped config into a folder for Cowork
+                                              (the interactive wizard also offers Local vs Cowork)
   mnemo init    [--vault DIR]                 Scaffold a vault (.mnemo/, folders, L0/log)
   mnemo index   [--vault DIR]                 Reindex into FTS5 + regenerate folder index.md
   mnemo indexes [--vault DIR]                 Regenerate folder index.md catalogs only
@@ -666,13 +667,14 @@ func cmdSetup(args []string) {
 		SkillsDest:  skillsDest,
 		WriteGraph:  !noGraph,
 		RegisterMCP: !noMCP,
+		Target:      target,
 	}
 
 	// Interactive wizard unless --yes was given. Require a real terminal so a
 	// piped/CI invocation fails fast instead of hanging on the TUI.
 	if !yes {
 		if !isatty.IsTerminal(os.Stdin.Fd()) && !isatty.IsCygwinTerminal(os.Stdin.Fd()) {
-			fatal("setup needs a terminal; for non-interactive install pass --yes with --vault and --scope")
+			fatal("setup needs a terminal; for non-interactive install pass --yes (local) or --cowork --target")
 		}
 		chosen, err := setup.RunWizard(opts)
 		if err != nil {
@@ -685,6 +687,14 @@ func cmdSetup(args []string) {
 			chosen.RegisterMCP = false
 		}
 		opts = chosen
+	}
+
+	// The wizard (or the --cowork flag handled above) may select cowork mode.
+	if opts.Cowork {
+		if err := setup.RunCowork(opts, os.Stdout); err != nil {
+			fatal("setup --cowork: %v", err)
+		}
+		return
 	}
 
 	if err := setup.Run(opts, os.Stdout); err != nil {

@@ -24,6 +24,7 @@ type Options struct {
 	SkillsDest  string // where skills are installed (default ~/.claude/skills/mnemo)
 	WriteGraph  bool   // write Obsidian graph.json
 	RegisterMCP bool   // run `claude mcp add`
+	Cowork      bool   // cowork mode: write project-scoped config into Target
 	Target      string // cowork: the folder to write project-scoped config into
 }
 
