@@ -40,8 +40,8 @@ func RunCowork(opts Options, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if fi, err := os.Stat(target); err != nil || !fi.IsDir() {
-		return fmt.Errorf("target folder %q does not exist", target)
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		return fmt.Errorf("create target folder: %w", err)
 	}
 	vaultDir := filepath.Join(target, coworkVaultDir)
 
