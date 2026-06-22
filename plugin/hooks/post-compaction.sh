@@ -18,5 +18,19 @@ Keep saving proactively from here on: after any decision, bugfix, discovery, ide
 status change, write it to mnemo.
 PROTOCOL
 
-"${MNEMO_BIN:-mnemo}" context 2>/dev/null || true
+BIN="${MNEMO_BIN:-mnemo}"
+
+# If the binary isn't runnable (cowork arch mismatch / build still in flight), the
+# wiki_* tools are absent — operate the vault with file tools instead of failing silently.
+if [[ "$MNEMO_BIN" == */* ]] && ! "$BIN" version >/dev/null 2>&1; then
+  cat <<'FALLBACK'
+
+### ⚠️ MARKDOWN-ONLY MODE — the wiki_* MCP tools are NOT available
+The mnemo binary is not runnable here, so persist/recover the compacted work with file tools:
+read/`Grep` over `Memory/` and write/edit `Memory/<type>/<slug>.md` directly. Do this anyway —
+the vault markdown is the source of truth.
+FALLBACK
+else
+  "$BIN" context 2>/dev/null || true
+fi
 exit 0

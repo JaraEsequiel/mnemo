@@ -95,7 +95,9 @@ func RunCowork(opts Options, out io.Writer) error {
 
 	fmt.Fprintf(out, "\nDone. This folder is now mnemo-ready for Cowork.\n")
 	fmt.Fprintf(out, "Point Cowork at %q and the sandbox loads everything from the folder.\n", target)
-	fmt.Fprintf(out, "Note: the copied binary is for linux/amd64 — rebuild it on a different host OS.\n")
+	fmt.Fprintf(out, "Note: the copied binary matches THIS host's arch. If the sandbox differs, the\n")
+	fmt.Fprintf(out, "SessionStart hook auto-rebuilds it (go install @main) — the wiki_* MCP tools come\n")
+	fmt.Fprintf(out, "online the next session; until then the agent uses markdown-only mode.\n")
 	return nil
 }
 
